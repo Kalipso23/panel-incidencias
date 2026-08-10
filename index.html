@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Incidencias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#EEF1F6;
+    --surface:#FFFFFF;
+    --surface-alt:#F5F7FA;
+    --border:#DFE4EB;
+    --text:#1B2430;
+    --text-muted:#69707D;
+    --text-faint:#9AA1AC;
+    --accent-primary:#2C5F8A;
+    --accent-primary-dark:#204866;
+    --c-tardanza:#D8624B;
+    --c-tardanza-bg:#FCEBE7;
+    --c-falta:#A63B4A;
+    --c-falta-bg:#F7E7EA;
+    --c-turno:#2C7DA0;
+    --c-turno-bg:#E7F1F5;
+    --c-sh-morning:#0891A8;
+    --c-sh-morning-bg:#E1F4F7;
+    --c-sh-afternoon:#7A2E3B;
+    --c-sh-afternoon-bg:#F3E4E7;
+    --c-sh-night:#1C6B3D;
+    --c-sh-night-bg:#E3F0E7;
+    --c-sh-vacaciones:#C9761E;
+    --c-sh-vacaciones-bg:#FBEBDA;
+    --c-sh-descanso:#A88A12;
+    --c-sh-descanso-bg:#FBF3D6;
+    --c-extra:#3F8F52;
+    --c-extra-bg:#E8F4EA;
+    --c-permiso:#7A5CB0;
+    --c-permiso-bg:#EFEAF8;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(27,36,48,0.04), 0 4px 14px rgba(27,36,48,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  ::selection{background:var(--accent-primary);color:#fff;}
+
+  /* Layout */
+  .app{display:flex; min-height:100vh;}
+  .sidebar{
+    width:260px; flex-shrink:0;
+    background:var(--surface);
+    border-right:1px solid var(--border);
+    padding:22px 16px;
+    display:flex; flex-direction:column; gap:20px;
+  }
+  .main{flex:1; padding:24px 32px 60px; max-width:1180px;}
+
+  .brand{display:flex; align-items:center; gap:10px; padding:0 4px 4px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:8px;
+    background:linear-gradient(135deg,var(--accent-primary),#4A8FC2);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;
+  }
+  .brand-text{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15.5px; letter-spacing:-0.01em;}
+  .brand-sub{font-size:11px; color:var(--text-faint); margin-top:-2px;}
+
+  .side-section-label{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--text-faint); font-weight:600; padding:0 6px; margin-bottom:2px;
+  }
+  .nav{display:flex; flex-direction:column; gap:2px;}
+  .nav-btn{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 10px; border-radius:8px; border:none; background:transparent;
+    color:var(--text-muted); font-size:13.5px; font-weight:500; text-align:left; cursor:pointer;
+    font-family:inherit; width:100%;
+  }
+  .nav-btn:hover{background:var(--surface-alt); color:var(--text);}
+  .nav-btn.active{background:var(--accent-primary); color:#fff;}
+  .nav-btn .dot{width:7px;height:7px;border-radius:50%; flex-shrink:0;}
+
+  .analyst-list{display:flex; flex-direction:column; gap:3px; overflow-y:auto;}
+  .analyst-item{
+    display:flex; align-items:center; gap:8px;
+    padding:7px 8px; border-radius:8px; cursor:pointer;
+    border:1px solid transparent;
+  }
+  .analyst-item:hover{background:var(--surface-alt);}
+  .analyst-item.active{background:var(--surface-alt); border-color:var(--border);}
+  .avatar{
+    width:26px;height:26px;border-radius:50%; flex-shrink:0;
+    background:var(--accent-primary-dark); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:10.5px; font-weight:600; font-family:'Space Grotesk',sans-serif;
+  }
+  .analyst-item .name{font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .analyst-item .strip{display:flex; gap:2px; margin-left:auto;}
+  .sq{width:5px;height:12px;border-radius:1px; background:var(--border);}
+
+  .add-analyst-btn{
+    margin-top:6px; padding:8px; border-radius:8px; border:1px dashed var(--border);
+    background:none; color:var(--text-muted); font-size:12.5px; cursor:pointer; font-family:inherit;
+  }
+  .add-analyst-btn:hover{border-color:var(--accent-primary); color:var(--accent-primary);}
+
+  /* Header */
+  .page-header{display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; gap:16px; flex-wrap:wrap;}
+  .page-title{font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; letter-spacing:-0.015em;}
+  .page-title .accent{color:var(--accent-primary);}
+  .page-desc{color:var(--text-muted); font-size:13px; margin-top:2px;}
+  select.month-picker{
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:8px 10px;
+    border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); cursor:pointer;
+  }
+
+  /* Stat cards */
+  .stats-row{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:26px;}
+  .stat-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 15px; box-shadow:var(--shadow);
+  }
+  .stat-card .num{font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700;}
+  .stat-card .lbl{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
+  .stat-card .bar{height:3px;border-radius:3px; margin-top:10px;}
+
+  /* Cards / sections */
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:20px;
+  }
+  .card + .card{margin-top:16px;}
+  .card-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between;}
+
+  /* Type selector */
+  .type-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:18px;}
+  .type-btn{
+    border:1.5px solid var(--border); background:var(--surface-alt); border-radius:9px;
+    padding:10px 6px; text-align:center; cursor:pointer; font-family:inherit;
+  }
+  .type-btn .ic{font-size:17px;}
+  .type-btn .lb{font-size:11px; font-weight:600; margin-top:4px; color:var(--text-muted);}
+  .type-btn.sel{border-color:currentColor; background:var(--sel-bg,#fff);}
+  .type-btn.sel .lb{color:inherit;}
+
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field.full{grid-column:1/-1;}
+  .field label{font-size:11.5px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;}
+  .field input, .field select, .field textarea{
+    font-family:inherit; font-size:13.5px; padding:8px 10px; border:1px solid var(--border);
+    border-radius:7px; background:var(--surface); color:var(--text);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--accent-primary); outline-offset:-1px;}
+  .field textarea{resize:vertical; min-height:56px; font-family:inherit;}
+
+  .btn{
+    font-family:inherit; font-size:13.5px; font-weight:600; padding:9px 16px; border-radius:8px;
+    border:none; cursor:pointer;
+  }
+  .btn-primary{background:var(--accent-primary); color:#fff;}
+  .btn-primary:hover{background:var(--accent-primary-dark);}
+  .btn-ghost{background:transparent; color:var(--text-muted); border:1px solid var(--border);}
+  .btn-ghost:hover{background:var(--surface-alt);}
+  .btn-row{display:flex; gap:8px; margin-top:16px; justify-content:flex-end;}
+
+  /* Table */
+  .filters{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .filters select, .filters input{
+    font-family:inherit; font-size:12.5px; padding:7px 9px; border:1px solid var(--border);
+    border-radius:7px; background:var(--surface-alt); color:var(--text);
+  }
+  table{width:100%; border-collapse:collapse;}
+  th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--text-faint); font-weight:600; padding:0 10px 8px; border-bottom:1px solid var(--border);
+  }
+  td{padding:10px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .badge{
+    display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px;
+    font-size:11px; font-weight:600;
+  }
+  .row-actions{display:flex; gap:6px; justify-content:flex-end;}
+  .icon-btn{
+    background:none; border:none; cursor:pointer; color:var(--text-faint); font-size:14px; padding:3px 5px; border-radius:5px;
+  }
+  .icon-btn:hover{background:var(--surface-alt); color:var(--text);}
+  .empty-state{text-align:center; padding:40px 20px; color:var(--text-faint);}
+  .empty-state .big{font-size:28px; margin-bottom:8px;}
+
+  /* Heatmap strip in analyst detail */
+  .heatmap{display:flex; gap:3px; flex-wrap:wrap; margin-top:10px;}
+  .hcell{width:16px; height:16px; border-radius:4px; background:var(--surface-alt); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; font-size:8px; color:var(--text-faint); position:relative;}
+  .hcell[data-tip]:hover::after{
+    content:attr(data-tip); position:absolute; bottom:120%; left:50%; transform:translateX(-50%);
+    background:var(--text); color:#fff; padding:4px 7px; border-radius:5px; font-size:10.5px; white-space:nowrap; z-index:5;
+  }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(27,36,48,0.4); display:flex; align-items:center; justify-content:center;
+    z-index:50; padding:20px;
+  }
+  .modal{background:var(--surface); border-radius:12px; padding:22px; width:100%; max-width:360px; box-shadow:0 10px 40px rgba(0,0,0,0.2);}
+  .modal h3{font-family:'Space Grotesk',sans-serif; margin:0 0 14px; font-size:16px;}
+
+  .toast{
+    position:fixed; bottom:20px; right:20px; background:var(--text); color:#fff; padding:11px 18px;
+    border-radius:9px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.2); z-index:60;
+    display:flex; align-items:center; gap:8px;
+  }
+
+  .login-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .login-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:32px;
+    width:100%; max-width:360px; box-shadow:var(--shadow); text-align:center;
+  }
+  .login-card .brand-mark{margin:0 auto 14px;}
+  .login-card h2{font-family:'Space Grotesk',sans-serif; font-size:19px; margin:0 0 4px;}
+  .login-card p{font-size:12.5px; color:var(--text-muted); margin:0 0 20px;}
+  .login-card .field{margin-bottom:12px; text-align:left;}
+  .login-card .btn-primary{width:100%; padding:10px; margin-top:6px;}
+  .login-error{color:var(--c-falta); font-size:12.5px; margin-top:10px; min-height:16px;}
+  .sync-pill{
+    display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-faint);
+    padding:6px 8px;
+  }
+  .sync-pill .dot{width:6px;height:6px;border-radius:50%; background:#3F8F52;}
+
+  @media (max-width:880px){
+    .app{flex-direction:column;}
+    .sidebar{width:100%; border-right:none; border-bottom:1px solid var(--border); flex-direction:row; flex-wrap:wrap;}
+    .stats-row{grid-template-columns:repeat(2,1fr);}
+    .form-grid{grid-template-columns:1fr;}
+    .type-grid{grid-template-columns:repeat(3,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen" style="display:none;">
+  <div class="login-card">
+    <div class="brand-mark" style="width:44px;height:44px;font-size:19px;">PI</div>
+    <h2>Panel de Incidencias</h2>
+    <p>Inicia sesión para ver y sincronizar tu información.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label>Correo electrónico</label>
+        <input type="email" id="loginEmail" required placeholder="tucorreo@ejemplo.com">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="loginPass" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary">Iniciar sesión</button>
+      <div class="login-error" id="loginError"></div>
+    </form>
+  </div>
+</div>
+
+<div class="app" id="appRoot" style="display:none;">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">PI</div>
+      <div>
+        <div class="brand-text">Panel de Incidencias</div>
+        <div class="brand-sub">Equipo de analistas</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="side-section-label">Vistas</div>
+      <div class="nav" id="navMain"></div>
+    </div>
+
+    <div style="flex:1; display:flex; flex-direction:column; min-height:0;">
+      <div class="side-section-label">Analistas</div>
+      <div class="analyst-list" id="analystList"></div>
+      <button class="add-analyst-btn" id="btnAddAnalyst">+ Agregar analista</button>
+      <button class="add-analyst-btn" id="btnManageAnalysts" style="margin-top:4px;">⚙ Gestionar / eliminar varios</button>
+    </div>
+
+    <div>
+      <div class="side-section-label">Respaldo</div>
+      <div class="nav">
+        <button class="nav-btn" id="btnExport">⬇ Exportar respaldo</button>
+        <button class="nav-btn" id="btnImport">⬆ Importar respaldo</button>
+      </div>
+      <input type="file" id="fileImport" accept="application/json" style="display:none">
+    </div>
+
+    <div style="border-top:1px solid var(--border); padding-top:10px;">
+      <div class="sync-pill"><span class="dot"></span> Sincronizado en la nube</div>
+      <button class="nav-btn" id="btnLogout" style="color:var(--c-falta);">⎋ Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title" id="pageTitle">Resumen <span class="accent">del mes</span></div>
+        <div class="page-desc" id="pageDesc">Vista general de retardos, turnos, horas extra y permisos.</div>
+      </div>
+      <select class="month-picker" id="monthPicker"></select>
+    </div>
+
+    <div id="viewRoot"></div>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+/* ---------------------------------------------------------
+   DATA MODEL & STORAGE
+--------------------------------------------------------- */
+const TYPES = {
+  tardanza:{label:'Retardo', icon:'⏰', color:'var(--c-tardanza)', bg:'var(--c-tardanza-bg)'},
+  falta:{label:'Falta', icon:'🚫', color:'var(--c-falta)', bg:'var(--c-falta-bg)'},
+  extra:{label:'Horas extra', icon:'⏱️', color:'var(--c-extra)', bg:'var(--c-extra-bg)'},
+  permiso:{label:'Permiso', icon:'📄', color:'var(--c-permiso)', bg:'var(--c-permiso-bg)'},
+};
+
+let state = {
+  analysts: [],
+  incidents: [],
+  schedule: [],
+  view: 'dashboard',
+  selectedAnalyst: null,
+  month: new Date().toISOString().slice(0,7),
+  formType: 'tardanza',
+  filters: {analyst:'', type:'', from:'', to:''},
+  editingIncident: null,
+  scheduleSubview: 'semana',
+  scheduleWeekKey: null,
+  scheduleAnalystId: null,
+};
+
+/* ---------------------------------------------------------
+   FIREBASE CONFIG — pega aquí tu firebaseConfig
+--------------------------------------------------------- */
+const firebaseConfig = {
+  apiKey: "PEGA_AQUI_TU_API_KEY",
+  authDomain: "PEGA_AQUI_TU_AUTH_DOMAIN",
+  projectId: "PEGA_AQUI_TU_PROJECT_ID",
+  storageBucket: "PEGA_AQUI_TU_STORAGE_BUCKET",
+  messagingSenderId: "PEGA_AQUI_TU_SENDER_ID",
+  appId: "PEGA_AQUI_TU_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const docRef = db.collection('panel').doc('data');
+let suppressNextSnapshot = false;
+let unsubscribeSnapshot = null;
+
+async function loadData(){
+  // Carga inicial: si el documento no existe, lo crea con datos de ejemplo.
+  const snap = await docRef.get();
+  if(snap.exists){
+    const d = snap.data();
+    state.analysts = d.analysts || [];
+    state.incidents = d.incidents || [];
+    state.schedule = d.schedule || [];
+  }else{
+    state.analysts = [
+      {id:cuid(), name:'María Torres', role:'Analista Sr.'},
+      {id:cuid(), name:'Luis Fernández', role:'Analista'},
+      {id:cuid(), name:'Ana Ramírez', role:'Analista'},
+    ];
+    state.incidents = [];
+    state.schedule = [];
+    await docRef.set({analysts:state.analysts, incidents:state.incidents, schedule:state.schedule});
+  }
+
+  // Escucha cambios en tiempo real (por ejemplo, si abres el panel en otro dispositivo)
+  unsubscribeSnapshot = docRef.onSnapshot(snap=>{
+    if(suppressNextSnapshot){ suppressNextSnapshot = false; return; }
+    if(!snap.exists) return;
+    const d = snap.data();
+    state.analysts = d.analysts || [];
+    state.incidents = d.incidents || [];
+    state.schedule = d.schedule || [];
+    renderAll();
+  });
+}
+async function saveAnalysts(){
+  try{
+    suppressNextSnapshot = true;
+    await docRef.set({analysts:state.analysts, incidents:state.incidents, schedule:state.schedule}, {merge:true});
+  }catch(e){ toast('No se pudo sincronizar (analistas)'); }
+}
+async function saveIncidents(){
+  try{
+    suppressNextSnapshot = true;
+    await docRef.set({analysts:state.analysts, incidents:state.incidents, schedule:state.schedule}, {merge:true});
+  }catch(e){ toast('No se pudo sincronizar (incidencias)'); }
+}
+async function saveSchedule(){
+  try{
+    suppressNextSnapshot = true;
+    await docRef.set({analysts:state.analysts, incidents:state.incidents, schedule:state.schedule}, {merge:true});
+  }catch(e){ toast('No se pudo sincronizar (turnos)'); }
+}
+function cuid(){ return 'id_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+/* ---------------------------------------------------------
+   HELPERS
+--------------------------------------------------------- */
+function splitIdName(raw){
+  const s = String(raw||'').trim();
+  const m = s.match(/^(\d+)\s+(.*)$/);
+  return m ? {id:m[1], name:m[2].trim()} : {id:'', name:s};
+}
+function initials(name){
+  const nameOnly = splitIdName(name).name || name;
+  return nameOnly.trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+}
+function fmtDate(d){
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('es-MX',{day:'2-digit', month:'short'});
+}
+function monthLabel(ym){
+  const [y,m] = ym.split('-');
+  const dt = new Date(parseInt(y), parseInt(m)-1, 1);
+  return dt.toLocaleDateString('es-MX',{month:'long', year:'numeric'});
+}
+function incidentsInMonth(ym){
+  return state.incidents.filter(i=>i.date.startsWith(ym));
+}
+function toast(msg){
+  const root = document.getElementById('toastRoot');
+  root.innerHTML = `<div class="toast">${msg}</div>`;
+  setTimeout(()=>{ root.innerHTML=''; }, 2200);
+}
+function analystName(id){
+  const a = state.analysts.find(x=>x.id===id);
+  return a ? a.name : '—';
+}
+
+/* ---------------------------------------------------------
+   RENDER: SIDEBAR
+--------------------------------------------------------- */
+function renderNav(){
+  const items = [
+    {id:'dashboard', label:'Resumen', icon:null},
+    {id:'registrar', label:'Registrar incidencia', icon:null},
+    {id:'historial', label:'Historial completo', icon:null},
+    {id:'turnos', label:'Turnos (consulta)', icon:null},
+  ];
+  document.getElementById('navMain').innerHTML = items.map(it=>`
+    <button class="nav-btn ${state.view===it.id?'active':''}" data-nav="${it.id}">${it.label}</button>
+  `).join('');
+  document.querySelectorAll('[data-nav]').forEach(b=>{
+    b.onclick = ()=>{ state.view=b.dataset.nav; state.selectedAnalyst=null; renderAll(); };
+  });
+}
+
+function last14Strip(analystId){
+  const days = [];
+  for(let i=13;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  return days.map(d=>{
+    const inc = state.incidents.find(x=>x.analystId===analystId && x.date===d);
+    const color = inc ? TYPES[inc.type].color : 'var(--border)';
+    return `<div class="sq" style="background:${color}"></div>`;
+  }).join('');
+}
+
+function renderAnalystList(){
+  const el = document.getElementById('analystList');
+  if(state.analysts.length===0){
+    el.innerHTML = `<div style="font-size:12px;color:var(--text-faint);padding:8px;">Aún no hay analistas registrados.</div>`;
+    return;
+  }
+  el.innerHTML = state.analysts.map(a=>`
+    <div class="analyst-item ${state.selectedAnalyst===a.id?'active':''}" data-analyst="${a.id}">
+      <div class="avatar">${initials(a.name)}</div>
+      <div class="name">${a.name}</div>
+      <div class="strip">${last14Strip(a.id)}</div>
+    </div>
+  `).join('');
+  document.querySelectorAll('[data-analyst]').forEach(d=>{
+    d.onclick = ()=>{ state.selectedAnalyst=d.dataset.analyst; state.view='analista'; renderAll(); };
+  });
+}
+
+/* ---------------------------------------------------------
+   RENDER: MONTH PICKER
+--------------------------------------------------------- */
+function renderMonthPicker(){
+  const el = document.getElementById('monthPicker');
+  const months = new Set([state.month]);
+  state.incidents.forEach(i=>months.add(i.date.slice(0,7)));
+  const now = new Date().toISOString().slice(0,7);
+  months.add(now);
+  const sorted = Array.from(months).sort().reverse();
+  el.innerHTML = sorted.map(m=>`<option value="${m}" ${m===state.month?'selected':''}>${monthLabel(m)}</option>`).join('');
+  el.onchange = ()=>{ state.month = el.value; renderAll(); };
+}
+
+/* ---------------------------------------------------------
+   VIEW: DASHBOARD
+--------------------------------------------------------- */
+function viewDashboard(){
+  document.getElementById('pageTitle').innerHTML = `Resumen <span class="accent">del mes</span>`;
+  document.getElementById('pageDesc').textContent = `Vista general de retardos, turnos, horas extra y permisos — ${monthLabel(state.month)}.`;
+
+  const inMonth = incidentsInMonth(state.month);
+  const count = t => inMonth.filter(i=>i.type===t).length;
+  const extraHrs = inMonth.filter(i=>i.type==='extra').reduce((s,i)=>s+(parseFloat(i.horas)||0),0);
+
+  const stats = [
+    {num: state.analysts.length, lbl:'Analistas activos', color:'var(--accent-primary)'},
+    {num: count('tardanza'), lbl:'Retardos', color:'var(--c-tardanza)'},
+    {num: count('falta'), lbl:'Faltas', color:'var(--c-falta)'},
+    {num: extraHrs.toFixed(1)+'h', lbl:'Horas extra', color:'var(--c-extra)'},
+    {num: count('permiso'), lbl:'Permisos', color:'var(--c-permiso)'},
+  ];
+
+  const statsHtml = `<div class="stats-row">${stats.map(s=>`
+    <div class="stat-card">
+      <div class="num">${s.num}</div>
+      <div class="lbl">${s.lbl}</div>
+      <div class="bar" style="background:${s.color}"></div>
+    </div>
+  `).join('')}</div>`;
+
+  const recent = [...inMonth].sort((a,b)=> b.date.localeCompare(a.date)).slice(0,8);
+  const recentHtml = `
+    <div class="card">
+      <div class="card-title">Actividad reciente
+        <button class="btn btn-ghost" data-goto="historial" style="font-size:12px;padding:6px 12px;">Ver todo →</button>
+      </div>
+      ${recent.length? recentTable(recent) : emptyState('Sin incidencias registradas este mes', 'Usa "Registrar incidencia" para comenzar.')}
+    </div>`;
+
+  document.getElementById('viewRoot').innerHTML = statsHtml + recentHtml;
+  document.querySelectorAll('[data-goto]').forEach(b=> b.onclick = ()=>{ state.view=b.dataset.goto; renderAll(); });
+  bindRowActions();
+}
+
+function recentTable(list){
+  return `<table><thead><tr>
+    <th>Analista</th><th>Tipo</th><th>Fecha</th><th>Detalle</th><th></th>
+  </tr></thead><tbody>
+  ${list.map(i=>rowHtml(i)).join('')}
+  </tbody></table>`;
+}
+
+function rowHtml(i){
+  const t = TYPES[i.type] || {label:i.type, icon:'📌', color:'var(--text-muted)', bg:'var(--surface-alt)'};
+  return `<tr>
+    <td>${analystName(i.analystId)}</td>
+    <td><span class="badge" style="background:${t.bg};color:${t.color}">${t.icon} ${t.label}</span></td>
+    <td class="mono">${fmtDate(i.date)}</td>
+    <td>${detailText(i)}</td>
+    <td><div class="row-actions">
+      <button class="icon-btn" data-edit="${i.id}" title="Editar">✎</button>
+      <button class="icon-btn" data-del="${i.id}" title="Eliminar">🗑</button>
+    </div></td>
+  </tr>`;
+}
+
+function detailText(i){
+  switch(i.type){
+    case 'tardanza': return `Llegó ${i.hora||''} · ${i.minutos||0} min tarde`;
+    case 'falta': return `${i.justificada==='si'?'Justificada':'Injustificada'}${i.motivo? ' · '+i.motivo:''}`;
+    case 'turno': return `${i.turno||''} · ${i.horaInicio||''}–${i.horaFin||''}`;
+    case 'extra': return `${i.horas||0} h${i.motivo? ' · '+i.motivo:''}`;
+    case 'permiso': return `${i.tipoPermiso||''}${i.dias? ' · '+i.dias+' día(s)':''}`;
+    default: return i.notas||'';
+  }
+}
+
+function emptyState(title, sub){
+  return `<div class="empty-state"><div class="big">📋</div><div style="font-weight:600;color:var(--text-muted)">${title}</div><div style="font-size:12.5px;margin-top:3px;">${sub}</div></div>`;
+}
+
+/* ---------------------------------------------------------
+   VIEW: REGISTRAR
+--------------------------------------------------------- */
+function viewRegistrar(){
+  document.getElementById('pageTitle').innerHTML = `Registrar <span class="accent">incidencia</span>`;
+  document.getElementById('pageDesc').textContent = `Captura un retardo, falta, turno, horas extra o permiso.`;
+
+  const analystOptions = state.analysts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="card">
+      <div class="card-title">Tipo de incidencia</div>
+      <div class="type-grid" id="typeGrid">
+        ${Object.entries(TYPES).map(([k,v])=>`
+          <button class="type-btn ${state.formType===k?'sel':''}" data-type="${k}" style="color:${v.color}; --sel-bg:${v.bg}">
+            <div class="ic">${v.icon}</div><div class="lb">${v.label}</div>
+          </button>
+        `).join('')}
+      </div>
+      <form id="incidentForm">
+        <div class="form-grid">
+          <div class="field">
+            <label>Analista</label>
+            <select name="analystId" required>${analystOptions || '<option value="">Agrega un analista primero</option>'}</select>
+          </div>
+          <div class="field">
+            <label>Fecha</label>
+            <input type="date" name="date" required value="${new Date().toISOString().slice(0,10)}">
+          </div>
+          ${formFieldsFor(state.formType)}
+          <div class="field full">
+            <label>Notas (opcional)</label>
+            <textarea name="notas" placeholder="Contexto adicional…"></textarea>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Guardar incidencia</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.querySelectorAll('[data-type]').forEach(b=>{
+    b.onclick = ()=>{ state.formType = b.dataset.type; viewRegistrar(); };
+  });
+
+  document.getElementById('incidentForm').onsubmit = async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    if(!fd.get('analystId')){ toast('Agrega un analista primero'); return; }
+    const record = {id:cuid(), type:state.formType};
+    for(const [k,v] of fd.entries()) record[k]=v;
+    state.incidents.push(record);
+    await saveIncidents();
+    toast('Incidencia guardada ✓');
+    e.target.reset();
+    state.view='historial';
+    renderAll();
+  };
+}
+
+function formFieldsFor(type){
+  switch(type){
+    case 'tardanza': return `
+      <div class="field"><label>Hora de llegada</label><input type="time" name="hora" required></div>
+      <div class="field"><label>Minutos de retraso</label><input type="number" min="1" name="minutos" required placeholder="15"></div>
+    `;
+    case 'falta': return `
+      <div class="field"><label>¿Justificada?</label>
+        <select name="justificada"><option value="si">Sí</option><option value="no">No</option></select>
+      </div>
+      <div class="field"><label>Motivo</label><input type="text" name="motivo" placeholder="Cita médica, personal…"></div>
+    `;
+    case 'turno': return `
+      <div class="field"><label>Turno</label>
+        <select name="turno">
+          <option>Mañana</option><option>Tarde</option><option>Noche</option><option>Rotativo</option>
+        </select>
+      </div>
+      <div class="field"><label>Hora inicio</label><input type="time" name="horaInicio" required></div>
+      <div class="field"><label>Hora fin</label><input type="time" name="horaFin" required></div>
+    `;
+    case 'extra': return `
+      <div class="field"><label>Horas laboradas</label><input type="number" step="0.5" min="0.5" name="horas" required placeholder="2.5"></div>
+      <div class="field"><label>Motivo</label><input type="text" name="motivo" placeholder="Cierre de mes, incidente…"></div>
+    `;
+    case 'permiso': return `
+      <div class="field"><label>Tipo de permiso</label>
+        <select name="tipoPermiso">
+          <option>Incapacidad médica</option><option>Permiso personal</option><option>Permiso con goce de sueldo</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Días</label><input type="number" min="1" name="dias" required placeholder="1"></div>
+    `;
+    default: return '';
+  }
+}
+
+/* ---------------------------------------------------------
+   VIEW: HISTORIAL
+--------------------------------------------------------- */
+function viewHistorial(){
+  document.getElementById('pageTitle').innerHTML = `Historial <span class="accent">completo</span>`;
+  document.getElementById('pageDesc').textContent = `Todas las incidencias registradas, con filtros.`;
+
+  const f = state.filters;
+  let list = [...state.incidents];
+  if(f.analyst) list = list.filter(i=>i.analystId===f.analyst);
+  if(f.type) list = list.filter(i=>i.type===f.type);
+  if(f.from) list = list.filter(i=>i.date>=f.from);
+  if(f.to) list = list.filter(i=>i.date<=f.to);
+  list.sort((a,b)=> b.date.localeCompare(a.date));
+
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="card">
+      <div class="filters">
+        <select id="fAnalyst"><option value="">Todos los analistas</option>
+          ${state.analysts.map(a=>`<option value="${a.id}" ${f.analyst===a.id?'selected':''}>${a.name}</option>`).join('')}
+        </select>
+        <select id="fType"><option value="">Todos los tipos</option>
+          ${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${f.type===k?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+        <input type="date" id="fFrom" value="${f.from}" title="Desde">
+        <input type="date" id="fTo" value="${f.to}" title="Hasta">
+      </div>
+      ${list.length ? recentTable(list) : emptyState('No hay incidencias con estos filtros', 'Ajusta los filtros o registra una nueva incidencia.')}
+    </div>
+  `;
+  document.getElementById('fAnalyst').onchange = e=>{ state.filters.analyst=e.target.value; renderAll(); };
+  document.getElementById('fType').onchange = e=>{ state.filters.type=e.target.value; renderAll(); };
+  document.getElementById('fFrom').onchange = e=>{ state.filters.from=e.target.value; renderAll(); };
+  document.getElementById('fTo').onchange = e=>{ state.filters.to=e.target.value; renderAll(); };
+  bindRowActions();
+}
+
+/* ---------------------------------------------------------
+   VIEW: ANALISTA (detalle)
+--------------------------------------------------------- */
+function viewAnalista(){
+  const a = state.analysts.find(x=>x.id===state.selectedAnalyst);
+  if(!a){ state.view='dashboard'; renderAll(); return; }
+  document.getElementById('pageTitle').innerHTML = a.name;
+  document.getElementById('pageDesc').textContent = a.role || 'Analista';
+
+  const list = state.incidents.filter(i=>i.analystId===a.id).sort((x,y)=>y.date.localeCompare(x.date));
+
+  const days = [];
+  for(let i=29;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days.push(d.toISOString().slice(0,10)); }
+  const heat = days.map(d=>{
+    const inc = state.incidents.find(x=>x.analystId===a.id && x.date===d);
+    const bg = inc ? TYPES[inc.type].color : null;
+    const tip = inc ? `${fmtDate(d)}: ${TYPES[inc.type].label}` : fmtDate(d);
+    return `<div class="hcell" style="${bg?`background:${bg};border-color:${bg}`:''}" data-tip="${tip}"></div>`;
+  }).join('');
+
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="card">
+      <div class="card-title">
+        Últimos 30 días
+        <button class="btn btn-ghost" id="btnDelAnalyst" style="font-size:12px;padding:6px 12px;color:var(--c-falta);">Eliminar analista</button>
+      </div>
+      <div class="heatmap">${heat}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Historial de ${a.name}</div>
+      ${list.length ? recentTable(list) : emptyState('Sin incidencias registradas', 'Este analista no tiene historial todavía.')}
+    </div>
+  `;
+  document.getElementById('btnDelAnalyst').onclick = ()=> confirmDeleteAnalyst(a.id);
+  bindRowActions();
+}
+
+/* ---------------------------------------------------------
+   VIEW: TURNOS (solo consulta, se llena importando Excel)
+--------------------------------------------------------- */
+const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+/* Asigna color según el tipo de horario/anotación de la celda importada */
+function categorizeShiftText(text){
+  const t = String(text||'').toLowerCase();
+  if(/descanso/.test(t)) return {color:'var(--c-sh-descanso)', bg:'var(--c-sh-descanso-bg)'};
+  if(/vacac/.test(t))    return {color:'var(--c-sh-vacaciones)', bg:'var(--c-sh-vacaciones-bg)'};
+  if(/falta/.test(t))    return {color:'var(--c-falta)', bg:'var(--c-falta-bg)'};
+  if(/permiso/.test(t))  return {color:'var(--c-permiso)', bg:'var(--c-permiso-bg)'};
+
+  // Intenta leer la hora de inicio para ubicar el turno (mañana/tarde/noche)
+  const m = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if(m){
+    let hour = parseInt(m[1]);
+    const ampm = m[3];
+    if(ampm==='pm' && hour!==12) hour += 12;
+    if(ampm==='am' && hour===12) hour = 0;
+    if(hour>=6 && hour<14)  return {color:'var(--c-sh-morning)', bg:'var(--c-sh-morning-bg)'};   // 6:00am–2:00pm
+    if(hour>=14 && hour<22) return {color:'var(--c-sh-afternoon)', bg:'var(--c-sh-afternoon-bg)'}; // 2:00pm–10:00pm
+    return {color:'var(--c-sh-night)', bg:'var(--c-sh-night-bg)'};                                  // 10:00pm–6:00am
+  }
+  return {color:'var(--c-turno)', bg:'var(--c-turno-bg)'}; // categoría no reconocida (ej. "Día festivo")
+}
+const MESES_ES = {
+  ene:0, enero:0, feb:1, febrero:1, mar:2, marzo:2, abr:3, abril:3,
+  may:4, mayo:4, jun:5, junio:5, jul:6, julio:6, ago:7, agosto:7,
+  sep:8, sept:8, septiembre:8, setiembre:8, oct:9, octubre:9,
+  nov:10, noviembre:10, dic:11, diciembre:11
+};
+function lookupMonth(tok){
+  const t = String(tok||'').toLowerCase();
+  if(MESES_ES[t] !== undefined) return MESES_ES[t];
+  if(MESES_ES[t.slice(0,3)] !== undefined) return MESES_ES[t.slice(0,3)];
+  return null;
+}
+
+function getWeeksList(){
+  const map = new Map();
+  state.schedule.forEach(r=>{
+    const key = `${r.year}-W${r.weekNumber}`;
+    if(!map.has(key)) map.set(key, {key, year:r.year, weekNumber:r.weekNumber, dates:new Set()});
+    map.get(key).dates.add(r.date);
+  });
+  const weeks = Array.from(map.values()).map(w=>{
+    const dates = Array.from(w.dates).sort();
+    return {...w, from:dates[0], to:dates[dates.length-1]};
+  });
+  weeks.sort((a,b)=> b.year-a.year || b.weekNumber-a.weekNumber);
+  return weeks;
+}
+
+function viewTurnos(){
+  document.getElementById('pageTitle').innerHTML = `Turnos <span class="accent">(consulta)</span>`;
+  document.getElementById('pageDesc').textContent = `Programación importada desde Excel — solo lectura.`;
+
+  const weeks = getWeeksList();
+
+  const tabsHtml = `
+    <div style="display:flex; gap:8px; margin-bottom:16px; align-items:center; flex-wrap:wrap; justify-content:space-between;">
+      <div style="display:flex; gap:6px;">
+        <button class="btn ${state.scheduleSubview==='semana'?'btn-primary':'btn-ghost'}" id="tabSemana" style="padding:8px 14px;">Por semana</button>
+        <button class="btn ${state.scheduleSubview==='analista'?'btn-primary':'btn-ghost'}" id="tabAnalista" style="padding:8px 14px;">Concentrado por analista</button>
+      </div>
+      <button class="btn btn-primary" id="btnUploadExcel">⬆ Subir Excel de programación</button>
+    </div>`;
+
+  if(weeks.length === 0){
+    document.getElementById('viewRoot').innerHTML = tabsHtml + `<div class="card">${emptyState('Aún no hay turnos importados', 'Sube tu archivo de Excel de programación para ver el concentrado aquí.')}</div>`;
+    document.getElementById('btnUploadExcel').onclick = openUploadScheduleModal;
+    return;
+  }
+
+  let bodyHtml = '';
+  if(state.scheduleSubview === 'semana'){
+    if(!state.scheduleWeekKey || !weeks.find(w=>w.key===state.scheduleWeekKey)) state.scheduleWeekKey = weeks[0].key;
+    const week = weeks.find(w=>w.key===state.scheduleWeekKey);
+    const weekOptions = weeks.map(w=>`<option value="${w.key}" ${w.key===state.scheduleWeekKey?'selected':''}>Semana ${w.weekNumber} · ${w.year} (${fmtDate(w.from)} – ${fmtDate(w.to)})</option>`).join('');
+
+    const dayDates = [];
+    let d = new Date(week.from+'T00:00:00');
+    for(let i=0;i<7;i++){ dayDates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+
+    const rows = state.analysts.map(a=>{
+      const cells = dayDates.map(dt=>{
+        const rec = state.schedule.find(r=>r.analystId===a.id && r.date===dt && r.year===week.year && r.weekNumber===week.weekNumber);
+        if(!rec) return `<td style="color:var(--text-faint);font-size:12px;">—</td>`;
+        const cat = categorizeShiftText(rec.turnoText);
+        return `<td><span class="badge" style="background:${cat.bg};color:${cat.color};">${rec.turnoText}</span></td>`;
+      }).join('');
+      return `<tr><td style="font-weight:600;">${a.name}</td>${cells}</tr>`;
+    }).join('');
+
+    bodyHtml = `
+      <div class="card">
+        <div class="filters" style="justify-content:space-between;">
+          <select id="weekPicker">${weekOptions}</select>
+          <button class="btn btn-ghost" id="btnDelWeek" style="color:var(--c-falta);">🗑 Eliminar esta semana</button>
+        </div>
+        <table><thead><tr><th>Analista</th>${DIAS_SEMANA.map((dn,i)=>`<th>${dn}<br><span class="mono" style="font-weight:400;">${fmtDate(dayDates[i])}</span></th>`).join('')}</tr></thead>
+        <tbody>${rows || `<tr><td colspan="8">${emptyState('Sin analistas','Agrega analistas para verlos aquí.')}</td></tr>`}</tbody></table>
+      </div>`;
+  }else{
+    if(!state.scheduleAnalystId && state.analysts.length) state.scheduleAnalystId = state.analysts[0].id;
+    const analystOptions = state.analysts.map(a=>`<option value="${a.id}" ${a.id===state.scheduleAnalystId?'selected':''}>${a.name}</option>`).join('');
+
+    const rows = weeks.map(w=>{
+      const dayDates = [];
+      let d = new Date(w.from+'T00:00:00');
+      for(let i=0;i<7;i++){ dayDates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+      const cells = dayDates.map(dt=>{
+        const rec = state.schedule.find(r=>r.analystId===state.scheduleAnalystId && r.date===dt && r.year===w.year && r.weekNumber===w.weekNumber);
+        if(!rec) return `<td style="color:var(--text-faint);font-size:12px;">—</td>`;
+        const cat = categorizeShiftText(rec.turnoText);
+        return `<td><span class="badge" style="background:${cat.bg};color:${cat.color};">${rec.turnoText}</span></td>`;
+      }).join('');
+      return `<tr><td class="mono">Sem ${w.weekNumber} · ${w.year}</td>${cells}</tr>`;
+    }).join('');
+
+    bodyHtml = `
+      <div class="card">
+        <div class="filters"><select id="analystPicker">${analystOptions || '<option>Agrega un analista primero</option>'}</select></div>
+        <table><thead><tr><th>Semana</th>${DIAS_SEMANA.map(dn=>`<th>${dn}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>`;
+  }
+
+  document.getElementById('viewRoot').innerHTML = tabsHtml + bodyHtml;
+  document.getElementById('btnUploadExcel').onclick = openUploadScheduleModal;
+  document.getElementById('tabSemana').onclick = ()=>{ state.scheduleSubview='semana'; renderAll(); };
+  document.getElementById('tabAnalista').onclick = ()=>{ state.scheduleSubview='analista'; renderAll(); };
+  const wp = document.getElementById('weekPicker');
+  if(wp) wp.onchange = ()=>{ state.scheduleWeekKey = wp.value; renderAll(); };
+  const ap = document.getElementById('analystPicker');
+  if(ap) ap.onchange = ()=>{ state.scheduleAnalystId = ap.value; renderAll(); };
+  const dwBtn = document.getElementById('btnDelWeek');
+  if(dwBtn) dwBtn.onclick = ()=>{
+    const week = weeks.find(w=>w.key===state.scheduleWeekKey);
+    if(week) confirmDeleteWeek(week);
+  };
+}
+
+function confirmDeleteWeek(week){
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovlDelWeek">
+      <div class="modal">
+        <h3>Eliminar semana</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+          Esto borrará todos los turnos importados de la <strong>Semana ${week.weekNumber} · ${week.year}</strong>
+          (${fmtDate(week.from)} – ${fmtDate(week.to)}). Los analistas no se eliminan, solo su programación de esa semana.
+          Esta acción no se puede deshacer.
+        </p>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="cancelDelWeek">Cancelar</button>
+          <button class="btn btn-primary" style="background:var(--c-falta)" id="confirmDelWeek">Eliminar semana</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('ovlDelWeek').onclick = (e)=>{ if(e.target.id==='ovlDelWeek') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('cancelDelWeek').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+  document.getElementById('confirmDelWeek').onclick = async ()=>{
+    state.schedule = state.schedule.filter(r=> !(r.year===week.year && r.weekNumber===week.weekNumber));
+    await saveSchedule();
+    document.getElementById('modalRoot').innerHTML='';
+    toast('Semana eliminada ✓');
+    state.scheduleWeekKey = null;
+    renderAll();
+  };
+}
+
+/* ---------------------------------------------------------
+   IMPORTAR EXCEL DE PROGRAMACIÓN
+--------------------------------------------------------- */
+function normalizeName(s){
+  return String(s||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quita acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g,'') // quita puntuación
+    .trim().replace(/\s+/g,' ');
+}
+function nameTokensMatch(a, b){
+  const na = normalizeName(a), nb = normalizeName(b);
+  if(na === nb) return true;
+  const ta = na.split(' ').filter(Boolean).sort().join(' ');
+  const tb = nb.split(' ').filter(Boolean).sort().join(' ');
+  return ta === tb; // mismas palabras, distinto orden
+}
+
+function findExistingAnalystMatch(empId, empName){
+  if(empId){
+    const byId = state.analysts.find(x=>{
+      const xid = x.empId || splitIdName(x.name).id;
+      return xid && String(xid)===String(empId);
+    });
+    if(byId) return byId;
+  }
+  return state.analysts.find(x=> nameTokensMatch(splitIdName(x.name).name, empName)) || null;
+}
+
+function openUploadScheduleModal(){
+  const currentYear = new Date().getFullYear();
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovlSched">
+      <div class="modal" style="max-width:460px;">
+        <h3>Subir Excel de programación</h3>
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;">
+          El archivo debe tener una columna con "ID Nombre" del analista y una columna por día (LUNES, MARTES…) con el horario o "DESCANSO".
+        </p>
+        <div class="form-grid" style="margin-bottom:12px;">
+          <div class="field">
+            <label>Año de esta programación</label>
+            <input type="number" id="schedYear" value="${currentYear}" min="2020" max="2100">
+          </div>
+          <div class="field">
+            <label>Número de semana</label>
+            <input type="number" id="schedWeek" min="1" max="53" placeholder="Se detecta al subir">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Archivo Excel (.xlsx)</label>
+          <input type="file" id="schedFile" accept=".xlsx,.xls">
+        </div>
+        <div id="schedPreview" style="font-size:12.5px;color:var(--text-muted);max-height:220px;overflow-y:auto;"></div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" id="cancelSched">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="confirmSched" disabled>Importar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('ovlSched').onclick = (e)=>{ if(e.target.id==='ovlSched') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('cancelSched').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+
+  let parsedRecords = null;
+
+  document.getElementById('schedFile').onchange = async (e)=>{
+    const file = e.target.files[0];
+    const previewEl = document.getElementById('schedPreview');
+    const confirmBtn = document.getElementById('confirmSched');
+    confirmBtn.disabled = true;
+    parsedRecords = null;
+    if(!file) return;
+    previewEl.textContent = 'Analizando archivo…';
+    try{
+      const year = parseInt(document.getElementById('schedYear').value) || currentYear;
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const result = parseScheduleWorkbook(wb, year, file.name);
+      parsedRecords = result.records;
+      if(parsedRecords.length === 0){
+        previewEl.innerHTML = `<span style="color:var(--c-falta)">No se detectaron turnos. Revisa el formato del archivo.</span>`;
+      }else{
+        document.getElementById('schedWeek').value = result.weekNumber || '';
+        const uniqueEmployees = [];
+        const seen = new Set();
+        parsedRecords.forEach(r=>{
+          const key = r.empId+'|'+r.empName;
+          if(!seen.has(key)){ seen.add(key); uniqueEmployees.push(r); }
+        });
+        const rowsHtml = uniqueEmployees.map(r=>{
+          const match = findExistingAnalystMatch(r.empId, r.empName);
+          return `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">
+            <span>${r.empId? r.empId+' · ':''}${r.empName}</span>
+            <span style="color:${match?'var(--c-extra)':'var(--c-turno)'};white-space:nowrap;">${match? '↳ '+match.name : '+ nuevo'}</span>
+          </div>`;
+        }).join('');
+        previewEl.innerHTML = `
+          <div style="margin-bottom:6px;">Se detectaron <strong>${uniqueEmployees.length}</strong> analista(s) con <strong>${parsedRecords.length}</strong> turnos en total. Revisa el emparejamiento:</div>
+          ${rowsHtml}
+        `;
+        confirmBtn.disabled = false;
+      }
+    }catch(err){
+      previewEl.innerHTML = `<span style="color:var(--c-falta)">No se pudo leer el archivo. Verifica que sea un .xlsx válido.</span>`;
+    }
+  };
+
+  document.getElementById('confirmSched').onclick = async ()=>{
+    if(!parsedRecords || parsedRecords.length===0) return;
+    const weekOverride = parseInt(document.getElementById('schedWeek').value);
+    let createdCount = 0;
+    const finalRecords = [];
+    parsedRecords.forEach(r=>{
+      const before = state.analysts.length;
+      const analyst = matchOrCreateAnalyst(r.empId, r.empName);
+      if(state.analysts.length > before) createdCount++;
+      finalRecords.push({
+        id:cuid(), analystId:analyst.id, date:r.date, year:r.year,
+        weekNumber: weekOverride || r.weekNumber, turnoText:r.turnoText, isDescanso:r.isDescanso
+      });
+    });
+    // Reemplaza cualquier registro previo de las mismas semana(s) importadas para evitar duplicados
+    const importedWeekKeys = new Set(finalRecords.map(r=>`${r.year}-W${r.weekNumber}`));
+    state.schedule = state.schedule.filter(r=> !importedWeekKeys.has(`${r.year}-W${r.weekNumber}`));
+    state.schedule.push(...finalRecords);
+
+    await saveAnalysts();
+    await saveSchedule();
+    document.getElementById('modalRoot').innerHTML='';
+    toast(`Turnos importados ✓${createdCount? ' · '+createdCount+' analista(s) nuevo(s)':''}`);
+    state.scheduleSubview='semana';
+    state.scheduleWeekKey = null;
+    renderAll();
+  };
+}
+
+function matchOrCreateAnalyst(empId, empName){
+  const found = findExistingAnalystMatch(empId, empName);
+  if(found){ if(!found.empId && empId) found.empId = empId; return found; }
+  const displayName = empId ? `${empId} ${empName}` : empName;
+  const newA = {id:cuid(), name:displayName, role:'', empId:empId||''};
+  state.analysts.push(newA);
+  return newA;
+}
+
+function parseScheduleWorkbook(wb, year, fileName){
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+  if(!data || data.length < 2) return {records:[], weeksFound:[], weekNumber:null};
+
+  const headerRow = data[0];
+
+  // 1) Detectar columnas de día y sus números de fecha (LUNES 15, MARTES 16…)
+  const dayNameRegex = /^(LUNES|MARTES|MI[EÉ]RCOLES|JUEVES|VIERNES|S[AÁ]BADO|DOMINGO)/i;
+  const dayCols = []; // {colIndex, dayNum}
+  let weekNumber = null;
+  headerRow.forEach((cell, idx)=>{
+    if(cell == null) return;
+    const text = String(cell).trim();
+    const dm = text.match(dayNameRegex);
+    if(dm){
+      const numMatch = text.match(/\d+/);
+      const dayNum = numMatch ? parseInt(numMatch[0]) : null;
+      if(dayNum != null) dayCols.push({colIndex:idx, dayNum});
+    }
+    const wm = text.match(/SEMANA\s*(\d+)/i);
+    if(wm) weekNumber = parseInt(wm[1]);
+  });
+
+  // 2) Respaldo del número de semana: nombre del archivo, luego semana ISO
+  if(weekNumber == null && fileName){
+    const fm = fileName.match(/sem\w*[\s_\-]*(\d+)/i);
+    if(fm) weekNumber = parseInt(fm[1]);
+  }
+
+  // 3) Resolver mes (y cruce de año) usando anclas de texto tipo "29 Dic" / "21 de Junio"
+  //    encontradas en el nombre de la pestaña, propagando hacia adelante/atrás
+  //    según si el número de día sube o baja entre columnas.
+  const dayNums = dayCols.map(d=>d.dayNum);
+  const months = new Array(dayNums.length).fill(null);
+  const anchorRegex = /(\d{1,2})\s*(?:de\s+)?([a-záéíóúñ]{3,})/gi;
+  let am;
+  while((am = anchorRegex.exec(sheetName)) !== null){
+    const day = parseInt(am[1]);
+    const mi = lookupMonth(am[2]);
+    if(mi == null) continue;
+    dayNums.forEach((d, i)=>{ if(d === day) months[i] = mi; });
+  }
+  let anchorIdx = months.findIndex(m=>m!==null);
+  if(anchorIdx === -1){ months[0] = new Date().getMonth(); anchorIdx = 0; }
+  for(let i=anchorIdx-1; i>=0; i--){
+    months[i] = ((months[i+1] - (dayNums[i+1] < dayNums[i] ? 1 : 0)) + 12) % 12;
+  }
+  for(let i=anchorIdx+1; i<months.length; i++){
+    months[i] = (months[i-1] + (dayNums[i] < dayNums[i-1] ? 1 : 0)) % 12;
+  }
+  const yearOffsets = new Array(months.length).fill(0);
+  for(let i=1;i<months.length;i++){
+    yearOffsets[i] = yearOffsets[i-1] + (months[i] < months[i-1] ? 1 : 0);
+  }
+  const lastOffset = yearOffsets[yearOffsets.length-1] || 0;
+  const years = yearOffsets.map(o => year - (lastOffset - o));
+
+  dayCols.forEach((dc, i)=>{ dc.date = new Date(years[i], months[i], dc.dayNum); dc.year = years[i]; });
+
+  if(weekNumber == null){
+    weekNumber = dayCols.length ? isoWeekNumber(dayCols[0].date) : isoWeekNumber(new Date());
+  }
+
+  const records = [];
+  for(let r=1;r<data.length;r++){
+    const row = data[r];
+    if(!row || row[0]==null || String(row[0]).trim()==='') continue;
+    const cell = String(row[0]).trim();
+    const m = cell.match(/^(\d+)\s+(.*)$/);
+    const empId = m ? m[1] : '';
+    const empName = m ? m[2].trim() : cell;
+
+    dayCols.forEach(dc=>{
+      const val = row[dc.colIndex];
+      if(val == null || String(val).trim()==='') return;
+      const text = String(val).trim();
+      records.push({
+        empId, empName,
+        date: dc.date.toISOString().slice(0,10),
+        year: dc.year, weekNumber,
+        turnoText: text,
+        isDescanso: /descanso/i.test(text)
+      });
+    });
+  }
+
+  const weeksFound = [`Semana ${weekNumber}`];
+  return {records, weeksFound, weekNumber};
+}
+
+function isoWeekNumber(date){
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d-yearStart)/86400000)+1)/7);
+}
+
+/* ---------------------------------------------------------
+   ROW ACTIONS (edit/delete incident)
+--------------------------------------------------------- */
+function bindRowActions(){
+  document.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick = async ()=>{
+      state.incidents = state.incidents.filter(i=>i.id!==b.dataset.del);
+      await saveIncidents();
+      toast('Incidencia eliminada');
+      renderAll();
+    };
+  });
+  document.querySelectorAll('[data-edit]').forEach(b=>{
+    b.onclick = ()=> openEditModal(b.dataset.edit);
+  });
+}
+
+function openEditModal(id){
+  const inc = state.incidents.find(i=>i.id===id);
+  if(!inc) return;
+  const t = TYPES[inc.type];
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovl">
+      <div class="modal">
+        <h3>${t.icon} Editar ${t.label.toLowerCase()}</h3>
+        <form id="editForm">
+          <div class="field" style="margin-bottom:10px;">
+            <label>Fecha</label>
+            <input type="date" name="date" value="${inc.date}" required>
+          </div>
+          ${editFieldsFor(inc)}
+          <div class="field" style="margin-top:10px;">
+            <label>Notas</label>
+            <textarea name="notas">${inc.notas||''}</textarea>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="cancelEdit">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.getElementById('cancelEdit').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+  document.getElementById('ovl').onclick = (e)=>{ if(e.target.id==='ovl') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('editForm').onsubmit = async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    for(const [k,v] of fd.entries()) inc[k]=v;
+    await saveIncidents();
+    document.getElementById('modalRoot').innerHTML='';
+    toast('Cambios guardados ✓');
+    renderAll();
+  };
+}
+
+function editFieldsFor(inc){
+  switch(inc.type){
+    case 'tardanza': return `
+      <div class="field" style="margin-bottom:10px;"><label>Hora de llegada</label><input type="time" name="hora" value="${inc.hora||''}" required></div>
+      <div class="field"><label>Minutos de retraso</label><input type="number" name="minutos" value="${inc.minutos||''}" required></div>`;
+    case 'falta': return `
+      <div class="field" style="margin-bottom:10px;"><label>¿Justificada?</label>
+        <select name="justificada"><option value="si" ${inc.justificada==='si'?'selected':''}>Sí</option><option value="no" ${inc.justificada==='no'?'selected':''}>No</option></select></div>
+      <div class="field"><label>Motivo</label><input type="text" name="motivo" value="${inc.motivo||''}"></div>`;
+    case 'turno': return `
+      <div class="field" style="margin-bottom:10px;"><label>Turno</label>
+        <select name="turno">${['Mañana','Tarde','Noche','Rotativo'].map(o=>`<option ${inc.turno===o?'selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="field" style="margin-bottom:10px;"><label>Hora inicio</label><input type="time" name="horaInicio" value="${inc.horaInicio||''}" required></div>
+      <div class="field"><label>Hora fin</label><input type="time" name="horaFin" value="${inc.horaFin||''}" required></div>`;
+    case 'extra': return `
+      <div class="field" style="margin-bottom:10px;"><label>Horas laboradas</label><input type="number" step="0.5" name="horas" value="${inc.horas||''}" required></div>
+      <div class="field"><label>Motivo</label><input type="text" name="motivo" value="${inc.motivo||''}"></div>`;
+    case 'permiso': return `
+      <div class="field" style="margin-bottom:10px;"><label>Tipo de permiso</label>
+        <select name="tipoPermiso">${['Incapacidad médica','Permiso personal','Permiso con goce de sueldo','Otro'].map(o=>`<option ${inc.tipoPermiso===o?'selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="field"><label>Días</label><input type="number" name="dias" value="${inc.dias||''}" required></div>`;
+    default: return '';
+  }
+}
+
+/* ---------------------------------------------------------
+   ADD / DELETE ANALYST
+--------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('btnAddAnalyst').onclick = openAddAnalystModal;
+  document.getElementById('btnManageAnalysts').onclick = openManageAnalystsModal;
+  document.getElementById('btnExport').onclick = exportBackup;
+  document.getElementById('btnImport').onclick = ()=> document.getElementById('fileImport').click();
+  document.getElementById('fileImport').onchange = handleImportFile;
+});
+
+/* ---------------------------------------------------------
+   EXPORT / IMPORT BACKUP
+--------------------------------------------------------- */
+function exportBackup(){
+  const payload = {
+    tipo: 'panel-incidencias-respaldo',
+    version: 2,
+    exportadoEl: new Date().toISOString(),
+    analysts: state.analysts,
+    incidents: state.incidents,
+    schedule: state.schedule,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fecha = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `respaldo-panel-incidencias-${fecha}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('Respaldo descargado ✓');
+}
+
+function handleImportFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    let data;
+    try{
+      data = JSON.parse(evt.target.result);
+    }catch(err){
+      toast('El archivo no es un respaldo válido');
+      e.target.value = '';
+      return;
+    }
+    if(!data || !Array.isArray(data.analysts) || !Array.isArray(data.incidents)){
+      toast('El archivo no tiene el formato esperado');
+      e.target.value = '';
+      return;
+    }
+    if(!Array.isArray(data.schedule)) data.schedule = [];
+    openImportModal(data);
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function openImportModal(data){
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovlImp">
+      <div class="modal">
+        <h3>Importar respaldo</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+          El archivo contiene <strong>${data.analysts.length}</strong> analista(s),
+          <strong>${data.incidents.length}</strong> incidencia(s) y
+          <strong>${data.schedule.length}</strong> turno(s)${data.exportadoEl? ' (exportado el '+new Date(data.exportadoEl).toLocaleDateString('es-MX')+')':''}.
+          ¿Cómo quieres aplicarlo?
+        </p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="btn btn-primary" id="impReplace">Reemplazar todo lo actual</button>
+          <button class="btn btn-ghost" id="impMerge">Combinar con lo actual</button>
+          <button class="btn btn-ghost" id="impCancel">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('ovlImp').onclick = (e)=>{ if(e.target.id==='ovlImp') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('impCancel').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+  document.getElementById('impReplace').onclick = async ()=>{
+    state.analysts = data.analysts;
+    state.incidents = data.incidents;
+    state.schedule = data.schedule;
+    await saveAnalysts();
+    await saveIncidents();
+    await saveSchedule();
+    document.getElementById('modalRoot').innerHTML='';
+    toast('Respaldo restaurado ✓');
+    state.view='dashboard'; state.selectedAnalyst=null;
+    renderAll();
+  };
+  document.getElementById('impMerge').onclick = async ()=>{
+    const existingAnalystIds = new Set(state.analysts.map(a=>a.id));
+    data.analysts.forEach(a=>{ if(!existingAnalystIds.has(a.id)) state.analysts.push(a); });
+    const existingIncidentIds = new Set(state.incidents.map(i=>i.id));
+    data.incidents.forEach(i=>{ if(!existingIncidentIds.has(i.id)) state.incidents.push(i); });
+    const existingScheduleIds = new Set(state.schedule.map(s=>s.id));
+    data.schedule.forEach(s=>{ if(!existingScheduleIds.has(s.id)) state.schedule.push(s); });
+    await saveAnalysts();
+    await saveIncidents();
+    await saveSchedule();
+    document.getElementById('modalRoot').innerHTML='';
+    toast('Respaldo combinado ✓');
+    renderAll();
+  };
+}
+
+function openAddAnalystModal(){
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovl2">
+      <div class="modal">
+        <h3>+ Agregar analista</h3>
+        <form id="addAnalystForm">
+          <div class="field" style="margin-bottom:10px;">
+            <label>Nombre completo</label>
+            <input type="text" name="name" required placeholder="Ej. Jorge Medina">
+          </div>
+          <div class="field">
+            <label>Puesto (opcional)</label>
+            <input type="text" name="role" placeholder="Analista, Analista Sr…">
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="cancelAdd">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Agregar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.getElementById('cancelAdd').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+  document.getElementById('ovl2').onclick = (e)=>{ if(e.target.id==='ovl2') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('addAnalystForm').onsubmit = async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    state.analysts.push({id:cuid(), name:fd.get('name'), role:fd.get('role')||''});
+    await saveAnalysts();
+    document.getElementById('modalRoot').innerHTML='';
+    toast('Analista agregado ✓');
+    renderAll();
+  };
+}
+
+/* ---------------------------------------------------------
+   GESTIONAR / ELIMINAR VARIOS ANALISTAS
+--------------------------------------------------------- */
+function openManageAnalystsModal(){
+  renderManageAnalystsModal();
+}
+
+function renderManageAnalystsModal(){
+  const rowsHtml = state.analysts.map(a=>`
+    <label style="display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); cursor:pointer;">
+      <input type="checkbox" class="mgAnalystChk" value="${a.id}" style="width:16px;height:16px;">
+      <div class="avatar" style="width:24px;height:24px;font-size:9.5px;">${initials(a.name)}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:500;">${a.name}</div>
+        ${a.role? `<div style="font-size:11px;color:var(--text-faint);">${a.role}</div>`:''}
+      </div>
+    </label>
+  `).join('');
+
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovlManage">
+      <div class="modal" style="max-width:400px;">
+        <h3>Gestionar analistas</h3>
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
+          Selecciona los analistas que quieras eliminar. Se borrará también su historial de incidencias y turnos.
+        </p>
+        <label style="display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:12.5px; font-weight:600; color:var(--text-muted); border-bottom:1px solid var(--border); margin-bottom:2px;">
+          <input type="checkbox" id="mgSelectAll" style="width:16px;height:16px;">
+          Seleccionar todos (${state.analysts.length})
+        </label>
+        <div style="max-height:280px; overflow-y:auto; margin-bottom:14px;">
+          ${state.analysts.length ? rowsHtml : emptyState('No hay analistas', 'Agrega analistas primero.')}
+        </div>
+        <div class="btn-row" style="justify-content:space-between;">
+          <button type="button" class="btn btn-ghost" id="closeManage">Cerrar</button>
+          <button type="button" class="btn btn-primary" style="background:var(--c-falta)" id="btnDeleteSelected" disabled>Eliminar seleccionados (0)</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const overlay = document.getElementById('ovlManage');
+  overlay.onclick = (e)=>{ if(e.target.id==='ovlManage') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('closeManage').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+
+  const chks = ()=> Array.from(document.querySelectorAll('.mgAnalystChk'));
+  const delBtn = document.getElementById('btnDeleteSelected');
+  const selectAll = document.getElementById('mgSelectAll');
+
+  function refreshCount(){
+    const n = chks().filter(c=>c.checked).length;
+    delBtn.textContent = `Eliminar seleccionados (${n})`;
+    delBtn.disabled = n===0;
+  }
+  chks().forEach(c=> c.onchange = refreshCount);
+  selectAll.onchange = ()=>{
+    chks().forEach(c=> c.checked = selectAll.checked);
+    refreshCount();
+  };
+
+  delBtn.onclick = ()=>{
+    const ids = chks().filter(c=>c.checked).map(c=>c.value);
+    if(ids.length) confirmBulkDeleteAnalysts(ids);
+  };
+}
+
+function confirmBulkDeleteAnalysts(ids){
+  const names = state.analysts.filter(a=>ids.includes(a.id)).map(a=>a.name);
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovlBulkDel">
+      <div class="modal">
+        <h3>Eliminar ${ids.length} analista(s)</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
+          Se eliminarán junto con todo su historial de incidencias y turnos. Esta acción no se puede deshacer.
+        </p>
+        <div style="max-height:140px;overflow-y:auto;font-size:12.5px;color:var(--text-muted);margin-bottom:16px;background:var(--surface-alt);border-radius:8px;padding:8px 10px;">
+          ${names.map(n=>`• ${n}`).join('<br>')}
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="cancelBulkDel">Cancelar</button>
+          <button class="btn btn-primary" style="background:var(--c-falta)" id="confirmBulkDel">Sí, eliminar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('ovlBulkDel').onclick = (e)=>{ if(e.target.id==='ovlBulkDel') document.getElementById('modalRoot').innerHTML=''; };
+  document.getElementById('cancelBulkDel').onclick = ()=> renderManageAnalystsModal();
+  document.getElementById('confirmBulkDel').onclick = async ()=>{
+    const idSet = new Set(ids);
+    state.analysts = state.analysts.filter(a=> !idSet.has(a.id));
+    state.incidents = state.incidents.filter(i=> !idSet.has(i.analystId));
+    state.schedule = state.schedule.filter(s=> !idSet.has(s.analystId));
+    await saveAnalysts();
+    await saveIncidents();
+    await saveSchedule();
+    document.getElementById('modalRoot').innerHTML='';
+    toast(`${ids.length} analista(s) eliminado(s) ✓`);
+    state.view='dashboard'; state.selectedAnalyst=null;
+    renderAll();
+  };
+}
+
+function confirmDeleteAnalyst(id){
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" id="ovl3">
+      <div class="modal">
+        <h3>Eliminar analista</h3>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+          Esto eliminará al analista y todo su historial de incidencias. Esta acción no se puede deshacer.
+        </p>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="cancelDel">Cancelar</button>
+          <button class="btn btn-primary" style="background:var(--c-falta)" id="confirmDel">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('cancelDel').onclick = ()=> document.getElementById('modalRoot').innerHTML='';
+  document.getElementById('confirmDel').onclick = async ()=>{
+    state.analysts = state.analysts.filter(a=>a.id!==id);
+    state.incidents = state.incidents.filter(i=>i.analystId!==id);
+    state.schedule = state.schedule.filter(s=>s.analystId!==id);
+    await saveAnalysts();
+    await saveIncidents();
+    await saveSchedule();
+    document.getElementById('modalRoot').innerHTML='';
+    state.view='dashboard'; state.selectedAnalyst=null;
+    toast('Analista eliminado');
+    renderAll();
+  };
+}
+
+/* ---------------------------------------------------------
+   MASTER RENDER
+--------------------------------------------------------- */
+function renderAll(){
+  renderNav();
+  renderAnalystList();
+  renderMonthPicker();
+  if(state.view==='dashboard') viewDashboard();
+  else if(state.view==='registrar') viewRegistrar();
+  else if(state.view==='historial') viewHistorial();
+  else if(state.view==='analista') viewAnalista();
+  else if(state.view==='turnos') viewTurnos();
+}
+
+/* ---------------------------------------------------------
+   AUTENTICACIÓN
+--------------------------------------------------------- */
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(err){
+    errEl.textContent = 'Correo o contraseña incorrectos.';
+  }
+});
+
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  if(unsubscribeSnapshot) unsubscribeSnapshot();
+  await auth.signOut();
+});
+
+auth.onAuthStateChanged(async (user)=>{
+  if(user){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'flex';
+    document.getElementById('viewRoot').innerHTML = `<div class="empty-state">Cargando panel…</div>`;
+    await loadData();
+    renderAll();
+  }else{
+    document.getElementById('appRoot').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>
